@@ -40,15 +40,36 @@ const mesaFs = await mesa.fs.create({
 
 const bash = mesaFs.bash();
 
+console.log("Creating bash tools...");
+
+const repoPath = `/${org}/${repo}`;
+
 const { tools } = await createBashTool({
   sandbox: bash,
+  destination: repoPath,
   extraInstructions: [
     `You have bash access to the "${repo}" repository owned by "${org}".`,
-    `Files are mounted at /${org}/${repo}.`,
+    `Files are at ${repoPath}. You are already cd'd there.`,
     "Use standard unix commands (ls, cat, grep, find, head, etc.) to explore.",
-    `Always use absolute paths starting with /${org}/${repo}/.`,
   ].join("\n"),
+  onBeforeBashCall: ({ command }) => {
+    console.log(`\n\x1b[34m[tool] bash:\x1b[0m ${command.trim()}`);
+    return undefined;
+  },
+  onAfterBashCall: ({ command, result }) => {
+    const output = result.stdout || result.stderr;
+    if (output) {
+      const lines = output.trimEnd().split("\n");
+      const preview = lines.slice(0, 10).join("\n");
+      const suffix = lines.length > 10 ? `\n  ... (${lines.length - 10} more lines)` : "";
+      console.log(`\x1b[2m${preview}${suffix}\x1b[0m`);
+    }
+    console.log(`\x1b[2m[exit ${result.exitCode}]\x1b[0m`);
+    return undefined;
+  },
 });
+
+console.log("Tools created.");
 
 console.log(`Connected. You can now chat with the agent about ${org}/${repo}.`);
 console.log('Type "exit" or Ctrl+C to quit.\n');
@@ -60,6 +81,11 @@ const history: ModelMessage[] = [];
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
+});
+
+rl.on("close", () => {
+  console.log("\nBye!");
+  process.exit(0);
 });
 
 function prompt(): void {
@@ -76,6 +102,8 @@ function prompt(): void {
 
     try {
       let fullText = "";
+
+      console.log("\x1b[2m[calling LLM...]\x1b[0m");
 
       const result = streamText({
         model: anthropic("claude-sonnet-4-20250514"),
@@ -94,7 +122,10 @@ function prompt(): void {
 
       history.push({ role: "assistant", content: fullText });
     } catch (err) {
-      console.error("Error:", err instanceof Error ? err.message : err);
+      console.error(
+        "Error:",
+        err instanceof Error ? `${err.message}\n${err.stack}` : err
+      );
     }
 
     prompt();
