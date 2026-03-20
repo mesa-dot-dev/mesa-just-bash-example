@@ -34,8 +34,8 @@ console.log(`Connecting to ${org}/${repo} via Mesa...`);
 const mesa = new Mesa({ org });
 
 const mesaFs = await mesa.fs.create({
-  repos: [{ name: repo }],
-  mode: "ro",
+  repos: [{ name: repo, desiredBookmark: "main" }],
+  mode: "rw",
 });
 
 const bash = mesaFs.bash();
