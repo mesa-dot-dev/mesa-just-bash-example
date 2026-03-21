@@ -20,13 +20,13 @@ ANTHROPIC_API_KEY=your_anthropic_api_key
 ## Usage
 
 ```bash
-npx tsx src/index.ts <org> <repo>
+npm start <org> <repo>
 ```
 
 For example:
 
 ```bash
-npx tsx src/index.ts acme my-repo
+npm start acme my-repo
 ```
 
 This starts an interactive REPL. Ask the agent anything about the repo:

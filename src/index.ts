@@ -17,8 +17,14 @@ import "dotenv/config";
 import * as readline from "node:readline";
 import { anthropic } from "@ai-sdk/anthropic";
 import { Mesa } from "@mesadev/sdk";
-import { streamText, stepCountIs, type ModelMessage } from "ai";
-import { createBashTool } from "bash-tool";
+import { streamText, tool, stepCountIs, type ModelMessage } from "ai";
+import { z } from "zod";
+
+// --- ANSI helpers (zero deps) ---
+
+const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
+const blue = (s: string) => `\x1b[34m${s}\x1b[0m`;
+const red = (s: string) => `\x1b[31m${s}\x1b[0m`;
 
 const [org, repo] = process.argv.slice(2);
 
@@ -38,38 +44,30 @@ const mesaFs = await mesa.fs.create({
   mode: "rw",
 });
 
-const bash = mesaFs.bash();
+const bash = mesaFs.bash({ cwd: `/${org}/${repo}` });
 
-console.log("Creating bash tools...");
+// --- Tool ---
 
-const repoPath = `/${org}/${repo}`;
-
-const { tools } = await createBashTool({
-  sandbox: bash,
-  destination: repoPath,
-  extraInstructions: [
-    `You have bash access to the "${repo}" repository owned by "${org}".`,
-    `Files are at ${repoPath}. You are already cd'd there.`,
-    "Use standard unix commands (ls, cat, grep, find, head, etc.) to explore.",
-  ].join("\n"),
-  onBeforeBashCall: ({ command }) => {
-    console.log(`\n\x1b[34m[tool] bash:\x1b[0m ${command.trim()}`);
-    return undefined;
-  },
-  onAfterBashCall: ({ command, result }) => {
-    const output = result.stdout || result.stderr;
-    if (output) {
-      const lines = output.trimEnd().split("\n");
-      const preview = lines.slice(0, 10).join("\n");
-      const suffix = lines.length > 10 ? `\n  ... (${lines.length - 10} more lines)` : "";
-      console.log(`\x1b[2m${preview}${suffix}\x1b[0m`);
-    }
-    console.log(`\x1b[2m[exit ${result.exitCode}]\x1b[0m`);
-    return undefined;
-  },
-});
-
-console.log("Tools created.");
+const tools = {
+  bash: tool({
+    description: [
+      "Execute a bash command against the repository filesystem.",
+      `You have bash access to the "${repo}" repository owned by "${org}".`,
+      "Use standard unix commands (ls, cat, grep, find, head, etc.) to explore.",
+    ].join("\n"),
+    inputSchema: z.object({
+      command: z.string().describe("The bash command to execute"),
+    }),
+    execute: async ({ command }) => {
+      const result = await bash.exec(command);
+      return {
+        stdout: result.stdout,
+        stderr: result.stderr,
+        exitCode: result.exitCode,
+      };
+    },
+  }),
+};
 
 console.log(`Connected. You can now chat with the agent about ${org}/${repo}.`);
 console.log('Type "exit" or Ctrl+C to quit.\n');
@@ -88,6 +86,16 @@ rl.on("close", () => {
   process.exit(0);
 });
 
+/** Truncate text to first N lines with a summary suffix. */
+function truncate(text: string, maxLines = 10): string {
+  const lines = text.trimEnd().split("\n");
+  if (lines.length <= maxLines) return text.trimEnd();
+  return (
+    lines.slice(0, maxLines).join("\n") +
+    `\n  ... (${lines.length - maxLines} more lines)`
+  );
+}
+
 function prompt(): void {
   rl.question("> ", async (input) => {
     const trimmed = input.trim();
@@ -101,10 +109,6 @@ function prompt(): void {
     history.push({ role: "user", content: trimmed });
 
     try {
-      let fullText = "";
-
-      console.log("\x1b[2m[calling LLM...]\x1b[0m");
-
       const result = streamText({
         model: anthropic("claude-sonnet-4-20250514"),
         tools,
@@ -112,18 +116,77 @@ function prompt(): void {
         messages: history,
       });
 
-      for await (const chunk of result.textStream) {
-        process.stdout.write(chunk);
-        fullText += chunk;
+      // Track state for rendering newlines between sections
+      let lastType = "";
+
+      for await (const chunk of result.fullStream) {
+        switch (chunk.type) {
+          // --- Reasoning / thinking ---
+          case "reasoning-start":
+            console.log(dim("--- thinking ---"));
+            lastType = "reasoning";
+            break;
+          case "reasoning-delta":
+            process.stdout.write(dim(chunk.text));
+            break;
+          case "reasoning-end":
+            console.log("\n" + dim("--- /thinking ---"));
+            break;
+
+          // --- Text output ---
+          case "text-start":
+            if (lastType && lastType !== "text") console.log();
+            lastType = "text";
+            break;
+          case "text-delta":
+            process.stdout.write(chunk.text);
+            break;
+          case "text-end":
+            console.log();
+            break;
+
+          // --- Tool use ---
+          case "tool-call": {
+            if (lastType === "text") console.log();
+            lastType = "tool";
+            const { command } = chunk.input as { command: string };
+            console.log(`${blue("[bash]")} ${command.trim()}`);
+            break;
+          }
+
+          case "tool-result": {
+            const { stdout, stderr, exitCode } = chunk.output as {
+              stdout: string;
+              stderr: string;
+              exitCode: number;
+            };
+            const text = stdout || stderr;
+            if (text) console.log(dim(truncate(text)));
+            console.log(
+              dim(`[exit ${exitCode}]`) +
+                (exitCode !== 0 ? " " + red("(non-zero)") : "")
+            );
+            break;
+          }
+
+          // --- Errors ---
+          case "error":
+            console.error(red(`[error] ${chunk.error}`));
+            break;
+
+          default:
+            break;
+        }
       }
 
-      // Newline after streamed output
-      if (fullText) console.log();
-
-      history.push({ role: "assistant", content: fullText });
+      // Save response messages into history for multi-turn
+      const response = await result.response;
+      for (const msg of response.messages) {
+        history.push(msg as ModelMessage);
+      }
     } catch (err) {
       console.error(
-        "Error:",
+        red("Error:"),
         err instanceof Error ? `${err.message}\n${err.stack}` : err
       );
     }
