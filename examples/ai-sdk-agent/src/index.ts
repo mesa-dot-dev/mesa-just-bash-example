@@ -13,12 +13,6 @@
  *   ANTHROPIC_API_KEY   — Anthropic API key
  */
 
-import dotenv from "dotenv";
-import { fileURLToPath } from "node:url";
-import * as path from "node:path";
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.resolve(__dirname, "../../../.env") });
 import * as readline from "node:readline";
 import { anthropic } from "@ai-sdk/anthropic";
 import { Mesa } from "@mesadev/sdk";
