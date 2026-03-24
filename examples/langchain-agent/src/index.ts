@@ -16,7 +16,7 @@
 import * as readline from "node:readline";
 import { createAgent, tool } from "langchain";
 import { ChatAnthropic } from "@langchain/anthropic";
-import { AIMessageChunk } from "@langchain/core/messages";
+import { HumanMessage } from "@langchain/core/messages";
 import type { BaseMessage } from "@langchain/core/messages";
 import { Mesa } from "@mesadev/sdk";
 import { z } from "zod";
@@ -53,12 +53,14 @@ const bashInputSchema = z.object({
   command: z.string().describe("The bash command to execute"),
 });
 
+const bashOutputSchema = z.object({
+  stdout: z.string(),
+  stderr: z.string(),
+  exitCode: z.number(),
+});
+
 const bashTool = tool(
-  async ({ command }: { command: string }) => {
-    const result = await bash.exec(command);
-    const output = result.stdout || result.stderr;
-    return [output, `[exit ${result.exitCode}]`].filter(Boolean).join("\n");
-  },
+  ({ command }) => bash.exec(command),
   {
     name: "bash",
     description: [
@@ -67,6 +69,7 @@ const bashTool = tool(
       "Use standard unix commands (ls, cat, grep, find, head, etc.) to explore.",
     ].join("\n"),
     schema: bashInputSchema,
+
   }
 );
 
@@ -82,7 +85,7 @@ console.log('Type "exit" or Ctrl+C to quit.\n');
 
 // --- REPL ---
 
-let history: BaseMessage[] = [];
+let messages: BaseMessage[] = [];
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -90,7 +93,7 @@ const rl = readline.createInterface({
 });
 
 rl.on("close", () => {
-  console.log("\nBye!");
+  console.log("\nDisconnected.");
   process.exit(0);
 });
 
@@ -104,97 +107,64 @@ function truncate(text: string, maxLines = 10): string {
   );
 }
 
+let lastBlockType: string | undefined;
+
 function prompt(): void {
   rl.question("> ", async (input) => {
     const trimmed = input.trim();
     if (!trimmed) return prompt();
     if (trimmed === "exit") {
-      console.log("Bye!");
       rl.close();
-      process.exit(0);
     }
 
-    history.push({ role: "user", content: trimmed } as any);
+    messages.push(new HumanMessage(trimmed));
 
-    // Multi-mode streaming:
-    // - "messages": token-level AIMessageChunks (text deltas, reasoning blocks)
-    // - "updates":  complete messages per step (tool calls, tool results, history)
-    const stream = await agent.stream(
-      { messages: history },
-      { streamMode: ["messages", "updates"] }
-    );
+    // "messages" = token-level chunks for the UI; "values" = canonical history for the next request.
+    for await (const [mode, data] of await agent.stream(
+      { messages },
+      // "values" = full graph state after each step (canonical messages for the next turn).
+      // Do not persist "messages" stream chunks: they are partial and may be empty text blocks,
+      // which Anthropic rejects on the following request.
+      { streamMode: ["values", "messages"] }
+    )) {
+      if (mode === "values") {
+        messages = data.messages;
+        continue;
+      }
 
-    // Track state for rendering newlines between sections
-    let lastType = "";
-
-    for await (const [mode, data] of stream) {
-      // --- Token-level streaming (text + reasoning) ---
       if (mode === "messages") {
-        const [chunk] = data as [AIMessageChunk, any];
-        if (!AIMessageChunk.isInstance(chunk)) continue;
+        const [chunk] = data;
 
         for (const block of chunk.contentBlocks) {
           switch (block.type) {
-            case "reasoning":
-              if (lastType !== "reasoning") {
-                console.log(dim("--- thinking ---"));
-                lastType = "reasoning";
-              }
-              if (block.reasoning) {
-                process.stdout.write(dim(block.reasoning));
-              }
+            case "reasoning": {
+              if (lastBlockType !== "reasoning") console.log(dim("\n--- thinking ---"));
+              process.stdout.write(dim(truncate(block.reasoning)));
+              lastBlockType = block.type;
               break;
-
-            case "text":
-              if (lastType === "reasoning") {
-                console.log("\n" + dim("--- /thinking ---"));
+            }
+            case "text": {
+              if (chunk.type === "tool") {
+                const output = bashOutputSchema.parse(JSON.parse(block.text));
+                const text = output.stdout || output.stderr;
+                if (text) console.log("\n" + dim(truncate(text)));
+                if (output.exitCode !== 0) console.error(red(`\n[exit ${output.exitCode}]`));
+                lastBlockType = 'tool_call_result';
+                break;
               }
-              if (lastType && lastType !== "text") console.log();
-              lastType = "text";
-              if (block.text) {
-                process.stdout.write(block.text);
-              }
+              if (lastBlockType !== "text") console.log("\n");
+              process.stdout.write(block.text);
+              lastBlockType = block.type;
               break;
+            }
+            case "tool_call": {
+              console.log("\n" + `${blue("[bash]")} ${block.name}`);
+              lastBlockType = block.type;
+              break;
+            }
           }
         }
       }
-
-      // --- Step-level updates (tool calls, tool results, history) ---
-      if (mode === "updates") {
-        const update = data as Record<string, any>;
-        const [, content] = Object.entries(update)[0];
-        const messages: BaseMessage[] = content?.messages ?? [];
-
-        for (const msg of messages) {
-          history.push(msg); // accumulate for multi-turn
-
-          if (AIMessageChunk.isInstance(msg)) {
-            // Render tool calls from the completed model response
-            const toolCalls = msg.tool_calls ?? [];
-            if (!toolCalls.length) continue;
-            if (lastType === "text" || lastType === "reasoning") {
-              console.log();
-            }
-            console.log(); // blank line before tool calls
-            lastType = "tool";
-            for (const tc of toolCalls) {
-              const { command } = bashInputSchema.parse(tc.args);
-              console.log(`${blue("[bash]")} ${command.trim()}`);
-            }
-          } else {
-            // Tool result — print the content directly
-            const raw =
-              typeof msg.content === "string" ? msg.content : "";
-            if (raw) console.log(dim(truncate(raw)));
-          }
-        }
-      }
-    }
-
-    // Final newline after text output
-    if (lastType === "text") console.log();
-    if (lastType === "reasoning") {
-      console.log("\n" + dim("--- /thinking ---"));
     }
 
     prompt();
