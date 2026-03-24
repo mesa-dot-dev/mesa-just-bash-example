@@ -116,92 +116,85 @@ function prompt(): void {
 
     history.push({ role: "user", content: trimmed } as any);
 
-    try {
-      // Multi-mode streaming:
-      // - "messages": token-level AIMessageChunks (text deltas, reasoning blocks)
-      // - "updates":  complete messages per step (tool calls, tool results, history)
-      const stream = await agent.stream(
-        { messages: history },
-        { streamMode: ["messages", "updates"] }
-      );
+    // Multi-mode streaming:
+    // - "messages": token-level AIMessageChunks (text deltas, reasoning blocks)
+    // - "updates":  complete messages per step (tool calls, tool results, history)
+    const stream = await agent.stream(
+      { messages: history },
+      { streamMode: ["messages", "updates"] }
+    );
 
-      // Track state for rendering newlines between sections
-      let lastType = "";
+    // Track state for rendering newlines between sections
+    let lastType = "";
 
-      for await (const [mode, data] of stream) {
-        // --- Token-level streaming (text + reasoning) ---
-        if (mode === "messages") {
-          const [chunk] = data as [AIMessageChunk, any];
-          if (!AIMessageChunk.isInstance(chunk)) continue;
+    for await (const [mode, data] of stream) {
+      // --- Token-level streaming (text + reasoning) ---
+      if (mode === "messages") {
+        const [chunk] = data as [AIMessageChunk, any];
+        if (!AIMessageChunk.isInstance(chunk)) continue;
 
-          for (const block of chunk.contentBlocks) {
-            switch (block.type) {
-              case "reasoning":
-                if (lastType !== "reasoning") {
-                  console.log(dim("--- thinking ---"));
-                  lastType = "reasoning";
-                }
-                if (block.reasoning) {
-                  process.stdout.write(dim(block.reasoning));
-                }
-                break;
-
-              case "text":
-                if (lastType === "reasoning") {
-                  console.log("\n" + dim("--- /thinking ---"));
-                }
-                if (lastType && lastType !== "text") console.log();
-                lastType = "text";
-                if (block.text) {
-                  process.stdout.write(block.text);
-                }
-                break;
-            }
-          }
-        }
-
-        // --- Step-level updates (tool calls, tool results, history) ---
-        if (mode === "updates") {
-          const update = data as Record<string, any>;
-          const [, content] = Object.entries(update)[0];
-          const messages: BaseMessage[] = content?.messages ?? [];
-
-          for (const msg of messages) {
-            history.push(msg); // accumulate for multi-turn
-
-            if (AIMessageChunk.isInstance(msg)) {
-              // Render tool calls from the completed model response
-              const toolCalls = msg.tool_calls ?? [];
-              if (!toolCalls.length) continue;
-              if (lastType === "text" || lastType === "reasoning") {
-                console.log();
+        for (const block of chunk.contentBlocks) {
+          switch (block.type) {
+            case "reasoning":
+              if (lastType !== "reasoning") {
+                console.log(dim("--- thinking ---"));
+                lastType = "reasoning";
               }
-              console.log(); // blank line before tool calls
-              lastType = "tool";
-              for (const tc of toolCalls) {
-                const { command } = bashInputSchema.parse(tc.args);
-                console.log(`${blue("[bash]")} ${command.trim()}`);
+              if (block.reasoning) {
+                process.stdout.write(dim(block.reasoning));
               }
-            } else {
-              // Tool result — print the content directly
-              const raw =
-                typeof msg.content === "string" ? msg.content : "";
-              if (raw) console.log(dim(truncate(raw)));
-            }
+              break;
+
+            case "text":
+              if (lastType === "reasoning") {
+                console.log("\n" + dim("--- /thinking ---"));
+              }
+              if (lastType && lastType !== "text") console.log();
+              lastType = "text";
+              if (block.text) {
+                process.stdout.write(block.text);
+              }
+              break;
           }
         }
       }
 
-      // Final newline after text output
-      if (lastType === "text") console.log();
-      if (lastType === "reasoning") {
-        console.log("\n" + dim("--- /thinking ---"));
+      // --- Step-level updates (tool calls, tool results, history) ---
+      if (mode === "updates") {
+        const update = data as Record<string, any>;
+        const [, content] = Object.entries(update)[0];
+        const messages: BaseMessage[] = content?.messages ?? [];
+
+        for (const msg of messages) {
+          history.push(msg); // accumulate for multi-turn
+
+          if (AIMessageChunk.isInstance(msg)) {
+            // Render tool calls from the completed model response
+            const toolCalls = msg.tool_calls ?? [];
+            if (!toolCalls.length) continue;
+            if (lastType === "text" || lastType === "reasoning") {
+              console.log();
+            }
+            console.log(); // blank line before tool calls
+            lastType = "tool";
+            for (const tc of toolCalls) {
+              const { command } = bashInputSchema.parse(tc.args);
+              console.log(`${blue("[bash]")} ${command.trim()}`);
+            }
+          } else {
+            // Tool result — print the content directly
+            const raw =
+              typeof msg.content === "string" ? msg.content : "";
+            if (raw) console.log(dim(truncate(raw)));
+          }
+        }
       }
-    } catch (err) {
-      console.error(
-        red("Error:"),
-        err instanceof Error ? `${err.message}\n${err.stack}` : err
-      );
+    }
+
+    // Final newline after text output
+    if (lastType === "text") console.log();
+    if (lastType === "reasoning") {
+      console.log("\n" + dim("--- /thinking ---"));
     }
 
     prompt();

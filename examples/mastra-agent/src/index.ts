@@ -124,56 +124,49 @@ function prompt(): void {
 
     history.push({ role: "user", content: trimmed });
 
-    try {
-      const stream = await agent.stream(history, {
-        maxSteps: 50,
-        onStepFinish: (step: any) => {
-          // Render tool calls from each step
-          // Mastra wraps tool calls/results: { type, payload: { args, result, ... } }
-          if (step.toolCalls?.length) {
-            console.log(); // blank line before tool calls
-            for (const tc of step.toolCalls) {
-              const args = tc.payload?.args ?? tc.args ?? {};
-              const command = (args as { command?: string }).command ?? "";
-              if (command) {
-                console.log(`${blue("[bash]")} ${command.trim()}`);
-              }
+    const stream = await agent.stream(history, {
+      maxSteps: 50,
+      onStepFinish: (step: any) => {
+        // Render tool calls from each step
+        // Mastra wraps tool calls/results: { type, payload: { args, result, ... } }
+        if (step.toolCalls?.length) {
+          console.log(); // blank line before tool calls
+          for (const tc of step.toolCalls) {
+            const args = tc.payload?.args ?? tc.args ?? {};
+            const command = (args as { command?: string }).command ?? "";
+            if (command) {
+              console.log(`${blue("[bash]")} ${command.trim()}`);
             }
           }
-          if (step.toolResults) {
-            for (const tr of step.toolResults) {
-              const result = tr.payload?.result ?? tr.result ?? {};
-              const { stdout, stderr, exitCode } = result as {
-                stdout: string;
-                stderr: string;
-                exitCode: number;
-              };
-              const text = stdout || stderr;
-              if (text) console.log(dim(truncate(text)));
-              console.log(
-                dim(`[exit ${exitCode}]`) +
-                  (exitCode !== 0 ? " " + red("(non-zero)") : "")
-              );
-            }
+        }
+        if (step.toolResults) {
+          for (const tr of step.toolResults) {
+            const result = tr.payload?.result ?? tr.result ?? {};
+            const { stdout, stderr, exitCode } = result as {
+              stdout: string;
+              stderr: string;
+              exitCode: number;
+            };
+            const text = stdout || stderr;
+            if (text) console.log(dim(truncate(text)));
+            console.log(
+              dim(`[exit ${exitCode}]`) +
+              (exitCode !== 0 ? " " + red("(non-zero)") : "")
+            );
           }
-        },
-      });
+        }
+      },
+    });
 
-      // Stream text output
-      for await (const chunk of stream.textStream) {
-        process.stdout.write(chunk);
-      }
-      console.log();
-
-      // Save assistant response to history
-      const response = await stream.text;
-      history.push({ role: "assistant", content: response });
-    } catch (err) {
-      console.error(
-        red("Error:"),
-        err instanceof Error ? `${err.message}\n${err.stack}` : err
-      );
+    // Stream text output
+    for await (const chunk of stream.textStream) {
+      process.stdout.write(chunk);
     }
+    console.log();
+
+    // Save assistant response to history
+    const response = await stream.text;
+    history.push({ role: "assistant", content: response });
 
     prompt();
   });
