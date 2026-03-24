@@ -106,6 +106,7 @@ function prompt(): void {
   rl.question("> ", async (input) => {
     const trimmed = input.trim();
     if (!trimmed) return prompt();
+
     if (trimmed === "exit") {
       console.log("Bye!");
       rl.close();
@@ -114,88 +115,64 @@ function prompt(): void {
 
     history.push({ role: "user", content: trimmed });
 
-    try {
-      const result = streamText({
-        model: anthropic("claude-sonnet-4-20250514"),
-        tools: { bash: bashTool },
-        stopWhen: stepCountIs(50),
-        messages: history,
-      });
+    const result = streamText({
+      model: anthropic("claude-sonnet-4-20250514"),
+      tools: { bash: bashTool },
+      stopWhen: stepCountIs(50),
+      messages: history,
+    });
 
-      // Track state for rendering newlines between sections
-      let lastType = "";
+    for await (const chunk of result.fullStream) {
+      switch (chunk.type) {
+        // --- Reasoning / thinking ---
+        case "reasoning-start":
+          console.log(dim("--- thinking ---"));
+          break;
+        case "reasoning-delta":
+          process.stdout.write(dim(chunk.text));
+          break;
+        case "reasoning-end":
+          console.log(`\n${dim("--- /thinking ---")}\n`);
+          break;
 
-      for await (const chunk of result.fullStream) {
-        switch (chunk.type) {
-          // --- Reasoning / thinking ---
-          case "reasoning-start":
-            console.log(dim("--- thinking ---"));
-            lastType = "reasoning";
-            break;
-          case "reasoning-delta":
-            process.stdout.write(dim(chunk.text));
-            break;
-          case "reasoning-end":
-            console.log("\n" + dim("--- /thinking ---"));
-            break;
+        // --- Text output ---
+        case "text-delta":
+          process.stdout.write(chunk.text);
+          break;
+        case "text-end":
+          console.log("\n");
+          break;
 
-          // --- Text output ---
-          case "text-start":
-            if (lastType && lastType !== "text") console.log();
-            lastType = "text";
-            break;
-          case "text-delta":
-            process.stdout.write(chunk.text);
-            break;
-          case "text-end":
-            console.log();
-            break;
-
-          // --- Tool use ---
-          case "tool-call": {
-            if (lastType === "text") console.log();
-            lastType = "tool";
-            if (chunk.toolName === "bash") {
-              const { command } = bashInputSchema.parse(chunk.input);
-              console.log(`${blue("[bash]")} ${command.trim()}`);
-            }
-            break;
-          }
-
-          case "tool-result": {
-            if (chunk.toolName === "bash") {
-              const { stdout, stderr, exitCode } = bashOutputSchema.parse(chunk.output);
-              const text = stdout || stderr;
-              if (text) console.log(dim(truncate(text)));
-              console.log(
-                dim(`[exit ${exitCode}]`) +
-                  (exitCode !== 0 ? " " + red("(non-zero)") : "")
-              );
-            }
-            break;
-          }
-
-          // --- Errors ---
-          case "error":
-            console.error(red(`[error] ${chunk.error}`));
-            break;
-
-          default:
-            break;
+        // --- Tool use ---
+        case "tool-call": {
+          if (chunk.toolName !== "bash") throw new Error(`Unexpected tool name: ${chunk.toolName}`);
+          const { command } = bashInputSchema.parse(chunk.input);
+          console.log(`${blue("[bash]")} ${command.trim()}`);
+          break;
         }
-      }
 
-      // Save response messages into history for multi-turn
-      const response = await result.response;
-      for (const msg of response.messages) {
-        history.push(msg as ModelMessage);
+        case "tool-result": {
+          if (chunk.toolName !== "bash") throw new Error(`Unexpected tool name: ${chunk.toolName}`);
+          const { stdout, stderr, exitCode } = bashOutputSchema.parse(chunk.output);
+          const text = stdout || stderr;
+          if (text) console.log(dim(truncate(text)));
+          if (exitCode !== 0) console.log(red(`[exit ${exitCode}] (non-zero)`));
+          break;
+        }
+
+        // --- Errors ---
+        case "error":
+          console.error(red(`[error] ${chunk.error}`));
+          break;
+
+        default:
+          break;
       }
-    } catch (err) {
-      console.error(
-        red("Error:"),
-        err instanceof Error ? `${err.message}\n${err.stack}` : err
-      );
     }
+
+    // Save response messages into history for multi-turn
+    const response = await result.response;
+    history.push(...response.messages);
 
     prompt();
   });
