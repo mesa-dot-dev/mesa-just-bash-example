@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // To run this example, create a .env file in this directory with:
-//   MESA_PRIVATE_KEY=your-signing-private-key
+//   MESA_PRIVATE_KEY=your-private-key
 //   DAYTONA_API_KEY=your-daytona-key
 //
 // Then run:
@@ -57,10 +57,10 @@ try {
   });
 
   // Mint the short-lived access token OUTSIDE the sandbox, where your private
-  // key lives. Only this token is injected below — your signing private key
+  // key lives. Only this token is injected below — your private key
   // never crosses the boundary. Signing is local (no network round-trip) and
   // the token expires on its own, so a compromised sandbox leaks at most a
-  // soon-to-expire credential scoped to the layout's repositories.
+  // soon-to-expire access token scoped to the layout's repositories.
   const { token } = await workspace.token();
 
   // You can run mesa in daemon mode to kick it off in the background.

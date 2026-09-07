@@ -44,11 +44,11 @@ Bye!
 
 | Variable | Description |
 |----------|-------------|
-| `MESA_PRIVATE_KEY` | Mesa signing private key stored only in the trusted host process |
+| `MESA_PRIVATE_KEY` | Mesa private key stored only in the trusted host process |
 | `FREESTYLE_API_KEY` | Freestyle API key ([get one here](https://freestyle.sh)) |
 
 ## Requirements
 
 - Node.js >= 18
-- Mesa account with a signing key
+- Mesa account with a private key
 - Freestyle account with an API key

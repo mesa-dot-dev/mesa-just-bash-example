@@ -48,11 +48,11 @@ By default, MesaFS mounts every repo the access token can access. Since this tok
 
 | Variable | Description |
 |----------|-------------|
-| `MESA_PRIVATE_KEY` | Mesa signing private key stored only in the trusted host process |
+| `MESA_PRIVATE_KEY` | Mesa private key stored only in the trusted host process |
 | `DAYTONA_API_KEY` | Daytona API key ([get one here](https://app.daytona.io)) |
 
 ## Requirements
 
 - Node.js >= 18
-- Mesa account with a signing key
+- Mesa account with a private key
 - Daytona account with an API key

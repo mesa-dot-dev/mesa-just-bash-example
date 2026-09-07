@@ -31,11 +31,11 @@ npm start
 | Variable | Description |
 |----------|-------------|
 | `MESA_REPO` | The repository to mount |
-| `MESA_PRIVATE_KEY` | Mesa signing private key |
+| `MESA_PRIVATE_KEY` | Mesa private key |
 | `ANTHROPIC_API_KEY` | Anthropic API key ([get one here](https://console.anthropic.com)) |
 
 ## Requirements
 
 - Node.js >= 18
-- Mesa account with a signing key
+- Mesa account with a private key
 - Anthropic API key

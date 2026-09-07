@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // To run this example, create a .env file in this directory with:
-//   MESA_PRIVATE_KEY=your-signing-private-key
+//   MESA_PRIVATE_KEY=your-private-key
 //   MESA_REPO=the-repo-to-mount
 //   SUPERSERVE_API_KEY=your-superserve-key
 //
@@ -38,10 +38,10 @@ const workspace = mesa.fs({
 });
 
 // Mint the short-lived access token OUTSIDE the sandbox, where your private key
-// lives. Only this token is injected below — your signing private key never
+// lives. Only this token is injected below — your private key never
 // crosses the boundary. Signing is local (no network round-trip) and the token
 // expires on its own, so a compromised sandbox leaks at most a soon-to-expire
-// credential scoped to the repositories the layout names.
+// access token scoped to the repositories the layout names.
 const { token } = await workspace.token();
 
 console.log('Creating Superserve sandbox...');

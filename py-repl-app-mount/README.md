@@ -54,10 +54,10 @@ Bye!
 | Variable | Description |
 |----------|-------------|
 | `MESA_REPO` | The repository to mount |
-| `MESA_PRIVATE_KEY` | Mesa signing private key ([get one here](https://mesa.dev)) |
+| `MESA_PRIVATE_KEY` | Mesa private key ([get one here](https://mesa.dev)) |
 
 ## Requirements
 
 - Python >= 3.10
 - [uv](https://docs.astral.sh/uv/)
-- Mesa account with a signing key
+- Mesa account with a private key

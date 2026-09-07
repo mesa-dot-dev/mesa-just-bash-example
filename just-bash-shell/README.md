@@ -43,9 +43,9 @@ Bye!
 | Variable | Description |
 |----------|-------------|
 | `MESA_REPO` | The repository to mount |
-| `MESA_PRIVATE_KEY` | Mesa signing private key |
+| `MESA_PRIVATE_KEY` | Mesa private key |
 
 ## Requirements
 
 - Node.js >= 18
-- Mesa account with a signing key
+- Mesa account with a private key

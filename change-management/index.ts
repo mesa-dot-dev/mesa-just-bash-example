@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // To run this example, create a .env file in this directory with:
-//   MESA_PRIVATE_KEY=your-signing-private-key
+//   MESA_PRIVATE_KEY=your-private-key
 //
 // Then run:
 //   npm start

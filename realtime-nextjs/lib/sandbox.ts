@@ -53,7 +53,7 @@ export async function ensureSandbox(mesa: Mesa): Promise<void> {
       // at the layout path rather than under the org browse tree.
       const repoPath = `${MOUNT_POINT}/workspace`;
       // The layout is both what the mount presents and what the token is scoped
-      // to. Minting happens on the trusted host; the signing private key never
+      // to. Minting happens on the trusted host; the private key never
       // enters the sandbox.
       const workspace = mesa.fs({
         layout: { '/workspace': repo(MESA_REPO, { mode: 'rw' }) },

@@ -35,7 +35,7 @@ Open [http://localhost:3000](http://localhost:3000). The sandbox may take a bit 
 
 | Variable | Required | Description |
 |---|---|---|
-| `MESA_PRIVATE_KEY` | Yes | Mesa signing private key stored only in the trusted host process |
+| `MESA_PRIVATE_KEY` | Yes | Mesa private key stored only in the trusted host process |
 | `MESA_REPO` | Yes | Name of an existing repo in your org |
 | `DAYTONA_API_KEY` | Yes | Daytona API key for sandbox creation |
 | `ANTHROPIC_API_KEY` | Yes | Passed to Claude Code in the sandbox |
@@ -60,6 +60,6 @@ The sandbox terminal starts in:
 ## Requirements
 
 - Node.js 20+
-- [Mesa](https://mesa.dev) account + signing key
+- [Mesa](https://mesa.dev) account + private key
 - [Daytona](https://daytona.io) account + API key
 - An existing repo in your Mesa org

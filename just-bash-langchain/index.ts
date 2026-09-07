@@ -2,7 +2,7 @@
 
 // To run this example, create a .env file in this directory with:
 //   MESA_REPO=your-repo
-//   MESA_PRIVATE_KEY=your-signing-private-key
+//   MESA_PRIVATE_KEY=your-private-key
 //   ANTHROPIC_API_KEY=your-anthropic-key
 //
 // Then run:

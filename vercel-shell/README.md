@@ -43,7 +43,7 @@ Bye!
 
 | Variable | Description |
 |----------|-------------|
-| `MESA_PRIVATE_KEY` | Mesa signing private key stored only in the trusted host process |
+| `MESA_PRIVATE_KEY` | Mesa private key stored only in the trusted host process |
 | `VERCEL_TEAM_ID` | Vercel team ID ([get one here](https://vercel.com/)) |
 | `VERCEL_PROJECT_ID` | Vercel project ID ([get one here](https://vercel.com/)) |
 | `VERCEL_TOKEN` | Vercel token ([get one here](https://vercel.com/)) |
@@ -51,5 +51,5 @@ Bye!
 ## Requirements
 
 - Node.js >= 18
-- Mesa account with a signing key
+- Mesa account with a private key
 - Vercel account and access tokens

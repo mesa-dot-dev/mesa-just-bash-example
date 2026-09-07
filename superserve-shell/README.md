@@ -35,7 +35,7 @@ Cleaning up sandbox...
 
 ## How it works
 
-1. Mints a scoped, short-lived access token from your signing private key (signed locally; the private key never enters the sandbox)
+1. Mints a scoped, short-lived access token from your private key (signed locally; the private key never enters the sandbox)
 2. Creates a Superserve sandbox from the default `superserve/base` template
 3. Installs the [Mesa CLI](https://docs.mesa.dev/content/mesafs/posix-mount) inside the sandbox
 4. Runs `mesa mount -d` with the short-lived token to start the FUSE daemon
@@ -56,11 +56,11 @@ The REPL (`repl.ts`) tracks your working directory and handles `cd`, `~` expansi
 
 | Variable | Description |
 |----------|-------------|
-| `MESA_PRIVATE_KEY` | Mesa signing private key stored only in the trusted host process |
+| `MESA_PRIVATE_KEY` | Mesa private key stored only in the trusted host process |
 | `SUPERSERVE_API_KEY` | Superserve API key ([get one here](https://superserve.ai)) |
 
 ## Requirements
 
 - Node.js >= 18
-- Mesa account with a signing key
+- Mesa account with a private key
 - Superserve account with an API key

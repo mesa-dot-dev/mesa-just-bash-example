@@ -36,19 +36,19 @@ Bye!
 1. Creates a Blaxel sandbox (Alpine-based, runs as root)
 2. Installs system dependencies and the Mesa CLI via the install script (`mesa.dev/install.sh`), which detects Alpine and adds the correct APK repository
    - Uses `gcompat` instead of `libc6-compat` to avoid gRPC deadlocks
-3. Mints a short-lived access token from your signing private key outside the sandbox and starts the Mesa FUSE daemon with it. Your private key never enters the sandbox.
+3. Mints a short-lived access token from your private key outside the sandbox and starts the Mesa FUSE daemon with it. Your private key never enters the sandbox.
 4. Drops you into a minimal REPL at the mount path
 
 ## Environment variables
 
 | Variable | Description |
 |----------|-------------|
-| `MESA_PRIVATE_KEY` | Mesa signing private key stored only in the trusted host process |
+| `MESA_PRIVATE_KEY` | Mesa private key stored only in the trusted host process |
 | `BL_API_KEY` | Blaxel API key |
 | `BL_WORKSPACE` | Blaxel workspace name (read automatically by the Blaxel SDK) |
 
 ## Requirements
 
 - Node.js >= 18
-- Mesa account with a signing key
+- Mesa account with a private key
 - Blaxel account with an API key and workspace
